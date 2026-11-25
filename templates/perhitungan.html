@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Detail Perhitungan — SPK Polusi Udara DKI Jakarta{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-4 pb-6 mb-8 border-b border-slate-200">
+    <div>
+        <h2 class="text-2xl font-bold text-slate-900">Detail Perhitungan</h2>
+        <p class="text-slate-600 mt-1">Rincian langkah matematis pembobotan AHP dan perangkingan SAW untuk keperluan verifikasi.</p>
+    </div>
+    <a href="{{ url_for('hasil_keputusan') }}"
+       class="px-4 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition">
+        Kembali ke Hasil Keputusan
+    </a>
+</div>
+
+<div class="space-y-8">
+    <!-- 1. Matriks Perbandingan AHP -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Matriks Perbandingan Berpasangan AHP</h3>
+        <p class="text-slate-600 mt-1 mb-5">Matriks skala Saaty 1–9 beserta jumlah masing-masing kolom sebelum normalisasi.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse tabular-nums">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3 px-4">Kriteria</th>
+                        {% for c in criteria %}<th class="py-3 px-4 text-right">{{ c }}</th>{% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for i in range(criteria|length) %}
+                    <tr>
+                        <td class="py-3 px-4 font-semibold text-slate-900">{{ criteria[i] }}</td>
+                        {% for j in range(criteria|length) %}
+                        <td class="py-3 px-4 text-right">{{ "%.4f"|format(matrix[i][j]) }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="bg-slate-50 font-bold text-slate-900">
+                        <td class="py-3 px-4">Jumlah Kolom</td>
+                        {% for s in ahp.col_sums %}<td class="py-3 px-4 text-right">{{ "%.4f"|format(s) }}</td>{% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. Normalisasi AHP dan Bobot -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Normalisasi Matriks AHP dan Bobot Kriteria</h3>
+        <p class="text-slate-600 mt-1 mb-5">Setiap elemen dibagi jumlah kolomnya, lalu dirata-ratakan per baris untuk memperoleh bobot kriteria.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg mb-4">
+            <table class="w-full text-left border-collapse tabular-nums">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3 px-4">Kriteria</th>
+                        {% for c in criteria %}<th class="py-3 px-4 text-right">{{ c }}</th>{% endfor %}
+                        <th class="py-3 px-4 text-right">Bobot (w)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for i in range(criteria|length) %}
+                    <tr>
+                        <td class="py-3 px-4 font-semibold text-slate-900">{{ criteria[i] }}</td>
+                        {% for val in ahp.norm_matrix[i] %}
+                        <td class="py-3 px-4 text-right">{{ "%.4f"|format(val) }}</td>
+                        {% endfor %}
+                        <td class="py-3 px-4 text-right font-bold text-slate-900">{{ "%.6f"|format(ahp.weights_table[i].bobot) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <p class="text-slate-600 tabular-nums">
+            Eigen Maksimum (&lambda; maks) = {{ "%.6f"|format(ahp.lambda_max) }} |
+            CI = {{ "%.6f"|format(ahp.ci) }} |
+            RI = {{ ahp.ri }} |
+            CR = <strong class="text-slate-900">{{ "%.6f"|format(ahp.cr) }}</strong>
+        </p>
+    </div>
+
+    <!-- 3. Matriks Keputusan Awal SAW -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Matriks Keputusan Awal SAW</h3>
+        <p class="text-slate-600 mt-1 mb-5">Nilai rata-rata parameter ISPU tiap stasiun pemantauan beserta nilai maksimum tiap kolom.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse tabular-nums">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3 px-4">Wilayah Pemantauan</th>
+                        {% for c in criteria %}<th class="py-3 px-4 text-right">{{ c }}</th>{% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for wilayah, vals in saw.decision_df.iterrows() %}
+                    <tr>
+                        <td class="py-3 px-4 font-medium text-slate-900">{{ wilayah }}</td>
+                        {% for c in criteria %}<td class="py-3 px-4 text-right">{{ "%.2f"|format(vals[c]) }}</td>{% endfor %}
+                    </tr>
+                    {% endfor %}
+                    <tr class="bg-slate-50 font-bold text-slate-900">
+                        <td class="py-3 px-4">Nilai Maksimum Kolom</td>
+                        {% for c in criteria %}<td class="py-3 px-4 text-right">{{ "%.2f"|format(saw.max_vals[c]) }}</td>{% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. Matriks Normalisasi SAW -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Matriks Normalisasi SAW (Atribut Benefit)</h3>
+        <p class="text-slate-600 mt-1 mb-5">Dihitung dengan membagi nilai setiap alternatif dengan nilai maksimum pada parameter yang sama.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse tabular-nums">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3 px-4">Wilayah Pemantauan</th>
+                        {% for c in criteria %}<th class="py-3 px-4 text-right">{{ c }}</th>{% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for wilayah, vals in saw.norm_df.iterrows() %}
+                    <tr>
+                        <td class="py-3 px-4 font-medium text-slate-900">{{ wilayah }}</td>
+                        {% for c in criteria %}<td class="py-3 px-4 text-right">{{ "%.4f"|format(vals[c]) }}</td>{% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 5. Matriks Terbobot dan Nilai Preferensi Akhir -->
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Matriks Terbobot dan Nilai Preferensi Akhir</h3>
+        <p class="text-slate-600 mt-1 mb-5">Hasil perkalian nilai normalisasi dengan bobot AHP yang dijumlahkan untuk menentukan peringkat akhir.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse tabular-nums">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3 px-4">Wilayah Pemantauan</th>
+                        {% for c in criteria %}<th class="py-3 px-4 text-right">{{ c }}</th>{% endfor %}
+                        <th class="py-3 px-4 text-right">Nilai Preferensi (V)</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for row in saw.ranking %}
+                    <tr class="{{ 'bg-teal-50/70' if row.ranking == 1 else '' }}">
+                        <td class="py-3 px-4 font-medium text-slate-900">{{ row.wilayah }}</td>
+                        {% for val in row.contributions %}<td class="py-3 px-4 text-right">{{ "%.4f"|format(val) }}</td>{% endfor %}
+                        <td class="py-3 px-4 text-right font-bold text-slate-900">{{ "%.6f"|format(row.nilai_v) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Hasil Keputusan — SPK Polusi Udara DKI Jakarta{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-4 pb-6 mb-8 border-b border-slate-200">
+    <div>
+        <h2 class="text-2xl font-bold text-slate-900">Hasil Keputusan</h2>
+        <p class="text-slate-600 mt-1">Urutan prioritas wilayah intervensi pengendalian polusi udara dan fokus tindakan.</p>
+    </div>
+    <a href="{{ url_for('detail_perhitungan') }}"
+       class="px-4 py-2.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium transition">
+        Lihat Detail Perhitungan
+    </a>
+</div>
+
+<!-- Rekomendasi Prioritas Utama -->
+{% set top = saw.ranking[0] %}
+<div class="bg-slate-800 text-white rounded-xl p-7 mb-8">
+    <div class="text-sm font-semibold text-teal-300">Rekomendasi Prioritas Utama (Peringkat 1)</div>
+    <h3 class="text-2xl font-bold mt-1">{{ top.wilayah }}</h3>
+    <p class="text-slate-200 mt-2">
+        Wilayah ini menempati urutan pertama untuk intervensi pengendalian polusi udara dengan nilai preferensi SAW
+        <span class="font-bold text-white tabular-nums">{{ "%.6f"|format(top.nilai_v) }}</span>.
+        Kontribusi pencemaran terbesar berasal dari parameter <span class="font-semibold text-white">{{ top.key_pollutants | join(', ') }}</span>.
+    </p>
+    <p class="text-slate-200 mt-3 pt-3 border-t border-slate-700">
+        <span class="font-semibold text-white">Fokus Tindakan:</span> {{ top.advice }}
+    </p>
+</div>
+
+<!-- Grafik Perbandingan Alternatif -->
+<div class="bg-white rounded-xl border border-slate-200 p-7 mb-8">
+    <h3 class="text-lg font-bold text-slate-900">Perbandingan Skor Preferensi dan Kontribusi Polutan</h3>
+    <p class="text-slate-600 mt-1 mb-6">Visualisasi kontribusi terbobot masing-masing parameter pencemar terhadap skor akhir setiap wilayah.</p>
+    <div class="h-96">
+    <canvas id="decisionComparisonChart"
+            data-ranking='{{ saw.ranking | tojson }}'
+            data-criteria='{{ criteria | tojson }}'></canvas>
+</div>
+</div>
+
+<!-- Tabel Peringkat dan Rekomendasi -->
+<div class="bg-white rounded-xl border border-slate-200 p-7">
+    <h3 class="text-lg font-bold text-slate-900">Peringkat Lengkap dan Rekomendasi Pengendalian</h3>
+    <p class="text-slate-600 mt-1 mb-5">Seluruh parameter dihitung sebagai kriteria benefit sehingga skor lebih tinggi berarti urgensi intervensi lebih besar.</p>
+    <div class="overflow-x-auto border border-slate-200 rounded-lg">
+        <table class="w-full text-left border-collapse min-w-[880px]">
+            <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                    <th class="py-3.5 px-4 w-32">Peringkat</th>
+                    <th class="py-3.5 px-4 min-w-[220px]">Wilayah Pemantauan</th>
+                    <th class="py-3.5 px-4 text-right w-32">Nilai SAW</th>
+                    <th class="py-3.5 px-4 w-44">Polutan Dominan</th>
+                    <th class="py-3.5 px-4">Rekomendasi Fokus Pengendalian</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+                {% for row in saw.ranking %}
+                <tr class="{{ 'bg-teal-50/70' if row.ranking == 1 else '' }}">
+                    <td class="py-3.5 px-4 font-bold text-slate-900">Peringkat {{ row.ranking }}</td>
+                    <td class="py-3.5 px-4 font-semibold text-slate-900">{{ row.wilayah }}</td>
+                    <td class="py-3.5 px-4 text-right font-bold tabular-nums text-slate-900">{{ "%.6f"|format(row.nilai_v) }}</td>
+                    <td class="py-3.5 px-4 font-medium text-slate-700">{{ row.key_pollutants | join(', ') }}</td>
+                    <td class="py-3.5 px-4 text-slate-600">{{ row.advice }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+    const decCanvas = document.getElementById('decisionComparisonChart');
+    if (decCanvas) {
+        const rankingData = JSON.parse(decCanvas.dataset.ranking);
+        const criteriaNames = JSON.parse(decCanvas.dataset.criteria);
+        const colors = ['#0d9488', '#1e293b', '#0284c7', '#f59e0b', '#e11d48', '#94a3b8'];
+
+        const datasets = criteriaNames.map((crit, idx) => ({
+            label: crit,
+            data: rankingData.map(r => r.contributions[idx]),
+            backgroundColor: colors[idx % colors.length],
+            categoryPercentage: 0.62,
+            barPercentage: 0.75,
+            borderRadius: idx === criteriaNames.length - 1 ? { topLeft: 6, topRight: 6 } : 0
+        }));
+
+        const totalLabelPlugin = {
+            id: 'totalLabelPlugin',
+            afterDatasetsDraw(chart) {
+                const { ctx } = chart;
+                const lastMeta = chart.getDatasetMeta(chart.data.datasets.length - 1);
+                ctx.save();
+                ctx.font = '600 13px "Plus Jakarta Sans", sans-serif';
+                ctx.fillStyle = '#0f172a';
+                ctx.textAlign = 'center';
+                lastMeta.data.forEach((bar, idx) => {
+                    const totalVal = rankingData[idx].nilai_v.toFixed(4);
+                    ctx.fillText(totalVal, bar.x, bar.y - 8);
+                });
+                ctx.restore();
+            }
+        };
+
+        new Chart(decCanvas, {
+            type: 'bar',
+            data: {
+                labels: rankingData.map(r => r.wilayah.replace(/^DKI\d\s+/, '')),
+                datasets: datasets
+            },
+            plugins: [totalLabelPlugin],
+            options: {
+                devicePixelRatio: 3,
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: { top: 24 }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, pointStyle: 'circle', padding: 20 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => rankingData[items[0].dataIndex].wilayah,
+                            label: (item) => `${item.dataset.label}: ${item.raw.toFixed(4)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        grid: { display: false },
+                        title: { display: true, text: 'Wilayah Pemantauan', padding: { top: 10 } }
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true,
+                        max: 1.0,
+                        ticks: { stepSize: 0.2 },
+                        grid: { color: '#f1f5f9' },
+                        title: { display: true, text: 'Nilai Preferensi SAW (V)' }
+                    }
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

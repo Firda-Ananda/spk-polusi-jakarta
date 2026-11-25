@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Pembobotan AHP — SPK Polusi Udara DKI Jakarta{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-4 pb-6 mb-8 border-b border-slate-200">
+    <div>
+        <h2 class="text-2xl font-bold text-slate-900">Pembobotan Kriteria (AHP)</h2>
+        <p class="text-slate-600 mt-1">Tentukan tingkat kepentingan relatif antarparameter polutan menggunakan skala perbandingan Saaty 1–9.</p>
+    </div>
+    <a href="{{ url_for('hasil_keputusan') }}"
+       class="px-5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold transition">
+        Lanjut ke Hasil Keputusan
+    </a>
+</div>
+
+<!-- Matriks Perbandingan Berpasangan -->
+<div class="bg-white rounded-xl border border-slate-200 p-6 mb-8">
+    <h3 class="text-lg font-bold text-slate-900">Matriks Perbandingan Berpasangan</h3>
+    <p class="text-slate-600 mt-1 mb-5">Pilih tingkat kepentingan polutan pada baris dibandingkan kolom. Sel di bawah diagonal otomatis terisi nilai kebalikannya.</p>
+
+    <form method="POST">
+        <div class="overflow-x-auto border border-slate-200 rounded-lg mb-5">
+            <table class="w-full text-left border-collapse min-w-[960px]">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3.5 px-4 w-28">Kriteria</th>
+                        {% for c in criteria %}
+                        <th class="py-3.5 px-4 min-w-[180px]">{{ c }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for i in range(criteria|length) %}
+                    <tr>
+                        <td class="py-3.5 px-4 font-bold text-slate-900">{{ criteria[i] }}</td>
+                        {% for j in range(criteria|length) %}
+                            {% if i == j %}
+                            <td class="py-3.5 px-4 text-slate-500 tabular-nums">1,00</td>
+                            {% elif i < j %}
+                            <td class="p-3 bg-teal-50/40">
+                                <select name="cell_{{ i }}_{{ j }}"
+                                        class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-none focus:border-teal-600">
+                                    {% for opt_val, opt_label in saaty_options %}
+                                    <option value="{{ opt_val }}" {% if (matrix[i][j] - opt_val)|abs < 0.001 %}selected{% endif %}>
+                                        {{ opt_label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            {% else %}
+                            <td class="py-3.5 px-4 text-slate-500 tabular-nums">{{ "%.4f"|format(matrix[i][j]) }}</td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex flex-wrap justify-between gap-3">
+            <button type="submit" name="action" value="reset_ahp"
+                    class="px-4 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium transition">
+                Reset Bobot Default
+            </button>
+            <button type="submit" name="action" value="update_ahp"
+                    class="px-5 py-2.5 rounded-lg bg-teal-700 hover:bg-teal-800 text-white font-semibold transition">
+                Hitung Bobot dan Uji Konsistensi
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Hasil Bobot dan Status Konsistensi -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Bobot Prioritas Kriteria</h3>
+        <p class="text-slate-600 mt-1 mb-5">Bobot hasil normalisasi yang digunakan dalam perangkingan SAW.</p>
+        <div class="overflow-x-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200 text-slate-700 font-semibold">
+                        <th class="py-3 px-4">Parameter Polutan</th>
+                        <th class="py-3 px-4 text-right">Bobot</th>
+                        <th class="py-3 px-4 text-right">Persentase</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 tabular-nums">
+                    {% for item in ahp.weights_table %}
+                    <tr>
+                        <td class="py-3 px-4 font-semibold text-slate-900">{{ item.kriteria }}</td>
+                        <td class="py-3 px-4 text-right">{{ "%.6f"|format(item.bobot) }}</td>
+                        <td class="py-3 px-4 text-right">{{ item.persen }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-6">
+        <h3 class="text-lg font-bold text-slate-900">Status Konsistensi</h3>
+        <p class="text-slate-600 mt-1 mb-5">Penilaian dinyatakan valid apabila nilai CR tidak melebihi 0,10.</p>
+
+        <div class="mb-5">
+            {% if ahp.is_consistent %}
+            <span class="inline-block px-4 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold">
+                Konsisten (CR &le; 0,10)
+            </span>
+            {% else %}
+            <span class="inline-block px-4 py-2 rounded-lg bg-red-50 border border-red-200 text-red-800 font-semibold">
+                Tidak Konsisten (CR &gt; 0,10)
+            </span>
+            {% endif %}
+        </div>
+
+        <table class="w-full text-left border-collapse border-t border-slate-200 tabular-nums">
+            <tbody class="divide-y divide-slate-200">
+                <tr>
+                    <td class="py-3 text-slate-600">Consistency Ratio (CR)</td>
+                    <td class="py-3 text-right font-bold text-slate-900">{{ "%.6f"|format(ahp.cr) }}</td>
+                </tr>
+                <tr>
+                    <td class="py-3 text-slate-600">Consistency Index (CI)</td>
+                    <td class="py-3 text-right">{{ "%.6f"|format(ahp.ci) }}</td>
+                </tr>
+                <tr>
+                    <td class="py-3 text-slate-600">Eigen Maksimum (&lambda; maks)</td>
+                    <td class="py-3 text-right">{{ "%.6f"|format(ahp.lambda_max) }}</td>
+                </tr>
+                <tr>
+                    <td class="py-3 text-slate-600">Random Index (RI, n = 6)</td>
+                    <td class="py-3 text-right">{{ ahp.ri }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
