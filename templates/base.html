@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script>
         tailwind.config = {
@@ -21,17 +22,50 @@
         }
     </script>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans text-[15px] leading-relaxed antialiased">
+<body class="bg-slate-100 text-slate-800 font-sans text-[14px] sm:text-[15px] leading-relaxed antialiased">
 
 <div class="min-h-screen flex flex-col lg:flex-row">
-    <!-- Sidebar Navigasi -->
-    <aside class="w-full lg:w-64 bg-slate-900 text-slate-200 flex-shrink-0">
-        <div class="px-6 py-7 border-b border-slate-800">
-            <h1 class="text-lg font-bold text-white tracking-tight">SPK Polusi Udara</h1>
-            <p class="text-sm text-slate-400 mt-1">Provinsi DKI Jakarta</p>
+    <!-- Top Header Khusus HP -->
+    <header class="lg:hidden bg-slate-900 text-white px-4 py-3.5 flex items-center justify-between sticky top-0 z-30 border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <button type="button" id="openSidebarBtn" aria-label="Buka Menu"
+                    class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white focus:outline-none">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+            <div>
+                <div class="text-base font-bold leading-tight">SPK Polusi Udara</div>
+                <div class="text-xs text-slate-400">Provinsi DKI Jakarta</div>
+            </div>
+        </div>
+        {% if ahp is defined and not ahp.is_consistent %}
+        <span class="px-2.5 py-1 rounded bg-red-900/70 border border-red-700 text-red-200 text-xs font-semibold">
+            CR &gt; 0,10
+        </span>
+        {% endif %}
+    </header>
+
+    <!-- Overlay Gelap Saat Sidebar Terbuka di HP -->
+    <div id="sidebarBackdrop" class="fixed inset-0 bg-slate-950/60 z-40 hidden lg:hidden"></div>
+
+    <!-- Sidebar Navigasi (Slide-over di HP, Tetap di Laptop) -->
+    <aside id="appSidebar"
+           class="fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-slate-200 flex-shrink-0 transform -translate-x-full transition-transform duration-200 ease-in-out lg:static lg:translate-x-0">
+        <div class="px-6 py-6 lg:py-7 border-b border-slate-800 flex items-center justify-between">
+            <div>
+                <h1 class="text-lg font-bold text-white tracking-tight">SPK Polusi Udara</h1>
+                <p class="text-sm text-slate-400 mt-0.5">Provinsi DKI Jakarta</p>
+            </div>
+            <button type="button" id="closeSidebarBtn" aria-label="Tutup Menu"
+                    class="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
         </div>
 
-        <nav class="p-4 flex flex-wrap lg:flex-col gap-1.5">
+        <nav class="p-4 flex flex-col gap-1.5">
             <a href="{{ url_for('dashboard') }}"
                class="px-4 py-3 rounded-lg text-[15px] font-medium transition {{ 'bg-teal-600 text-white font-semibold' if active_page == 'dashboard' else 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                 Dashboard
@@ -44,6 +78,17 @@
                class="px-4 py-3 rounded-lg text-[15px] font-medium transition {{ 'bg-teal-600 text-white font-semibold' if active_page == 'ahp' else 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                 Pembobotan AHP
             </a>
+
+            {% if ahp is defined and not ahp.is_consistent %}
+            <span title="Perbaiki konsistensi bobot AHP (CR ≤ 0,10) terlebih dahulu"
+                  class="px-4 py-3 rounded-lg text-[15px] font-medium text-slate-500 bg-slate-800/50 cursor-not-allowed select-none flex items-center justify-between gap-2">
+                <span>Hasil Keputusan</span>
+            </span>
+            <span title="Perbaiki konsistensi bobot AHP (CR ≤ 0,10) terlebih dahulu"
+                  class="px-4 py-3 rounded-lg text-[15px] font-medium text-slate-500 bg-slate-800/50 cursor-not-allowed select-none flex items-center justify-between gap-2">
+                <span>Detail Perhitungan</span>
+            </span>
+            {% else %}
             <a href="{{ url_for('hasil_keputusan') }}"
                class="px-4 py-3 rounded-lg text-[15px] font-medium transition {{ 'bg-teal-600 text-white font-semibold' if active_page == 'keputusan' else 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                 Hasil Keputusan
@@ -52,27 +97,41 @@
                class="px-4 py-3 rounded-lg text-[15px] font-medium transition {{ 'bg-teal-600 text-white font-semibold' if active_page == 'perhitungan' else 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                 Detail Perhitungan
             </a>
+            {% endif %}
         </nav>
     </aside>
 
-    <!-- Area Konten Utama -->
-    <main class="flex-1 px-6 py-8 lg:px-12 lg:py-10 max-w-6xl">
+    <!-- Konten Utama -->
+    <main class="flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-12 lg:py-10 max-w-6xl w-full overflow-x-hidden">
         {% if message %}
-        <div class="mb-6 px-5 py-3.5 rounded-lg bg-teal-50 border border-teal-200 text-teal-900 font-medium">
-            {{ message }}
-        </div>
+            <div class="mb-6 px-4 py-3 sm:px-5 sm:py-3.5 rounded-lg border bg-teal-50 border-teal-200 text-teal-900 text-sm sm:text-[15px]">
+                {{ message }}
+            </div>
         {% endif %}
-
         {% if error_msg %}
-        <div class="mb-6 px-5 py-3.5 rounded-lg bg-red-50 border border-red-200 text-red-900 font-medium">
-            {{ error_msg }}
-        </div>
+            <div class="mb-6 px-4 py-3 sm:px-5 sm:py-3.5 rounded-lg border bg-red-50 border-red-200 text-red-900 text-sm sm:text-[15px]">
+                {{ error_msg }}
+            </div>
         {% endif %}
 
         {% block content %}{% endblock %}
     </main>
 </div>
 
+<script>
+    $(document).ready(function () {
+        function openSidebar() {
+            $('#appSidebar').removeClass('-translate-x-full');
+            $('#sidebarBackdrop').removeClass('hidden');
+        }
+        function closeSidebar() {
+            $('#appSidebar').addClass('-translate-x-full');
+            $('#sidebarBackdrop').addClass('hidden');
+        }
+        $('#openSidebarBtn').on('click', openSidebar);
+        $('#closeSidebarBtn, #sidebarBackdrop').on('click', closeSidebar);
+    });
+</script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

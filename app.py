@@ -208,12 +208,38 @@ def pembobotan_ahp():
 @app.route("/keputusan")
 def hasil_keputusan():
     ctx = _get_state()
+    if not ctx["ahp"]["is_consistent"]:
+        return render_template(
+            "ahp.html",
+            active_page="ahp",
+            saaty_options=SAATY_SCALE_OPTIONS,
+            message=None,
+            error_msg=(
+                f"Akses ke Hasil Keputusan ditahan karena bobot AHP belum konsisten "
+                f"(CR = {ctx['ahp']['cr']}, batas maksimum 0,10). "
+                "Silakan sesuaikan kembali nilai perbandingan."
+            ),
+            **ctx,
+        )
     return render_template("keputusan.html", active_page="keputusan", **ctx)
 
 
 @app.route("/perhitungan")
 def detail_perhitungan():
     ctx = _get_state()
+    if not ctx["ahp"]["is_consistent"]:
+        return render_template(
+            "ahp.html",
+            active_page="ahp",
+            saaty_options=SAATY_SCALE_OPTIONS,
+            message=None,
+            error_msg=(
+                f"Akses ke Detail Perhitungan ditahan karena bobot AHP belum konsisten "
+                f"(CR = {ctx['ahp']['cr']}, batas maksimum 0,10). "
+                "Silakan sesuaikan kembali nilai perbandingan."
+            ),
+            **ctx,
+        )
     return render_template("perhitungan.html", active_page="perhitungan", **ctx)
 
 

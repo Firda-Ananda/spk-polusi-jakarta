@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — SPK Polusi Udara DKI Jakarta{% endblock %}
+{% block title %}Dashboard - SPK Polusi Udara DKI Jakarta{% endblock %}
 
 {% block content %}
 <div class="flex flex-wrap items-center justify-between gap-4 pb-6 mb-8 border-b border-slate-200">
@@ -71,17 +71,24 @@
             afterDatasetsDraw(chart) {
                 const { ctx } = chart;
                 const meta = chart.getDatasetMeta(0);
+                const isMobile = chart.width < 480;
+
                 ctx.save();
-                ctx.font = '600 13px "Plus Jakarta Sans", sans-serif';
+                ctx.font = isMobile
+                    ? '600 10px "Plus Jakarta Sans", sans-serif'
+                    : '600 13px "Plus Jakarta Sans", sans-serif';
                 ctx.fillStyle = '#0f172a';
                 ctx.textAlign = 'center';
                 meta.data.forEach((bar, idx) => {
                     const val = ranking[idx].nilai_v.toFixed(4);
-                    ctx.fillText(val, bar.x, bar.y - 8);
+                    // Di layar HP, posisi y dibuat bertingkat selang-seling agar 4 digit tidak bertabrakan
+                    const offsetY = isMobile ? (idx % 2 === 0 ? 6 : 18) : 8;
+                    ctx.fillText(val, bar.x, bar.y - offsetY);
                 });
                 ctx.restore();
             }
         };
+        
 
         new Chart(dashCanvas, {
             type: 'bar',
